@@ -64,7 +64,7 @@ import "go.fork.vn/mongodb"
 ### Update Import Statements
 **Old:**
 ```go
-import "github.com/go-fork/providers/mongodb"
+import "go.fork.vn/mongodb"
 ```
 
 **New:**

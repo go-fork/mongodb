@@ -4,8 +4,8 @@ go 1.23.9
 
 require (
 	github.com/stretchr/testify v1.10.0
-	go.fork.vn/di v0.1.0
 	go.fork.vn/config v0.1.0
+	go.fork.vn/di v0.1.0
 	go.mongodb.org/mongo-driver v1.17.3
 )
 

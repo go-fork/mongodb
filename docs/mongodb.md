@@ -337,7 +337,7 @@ db := client.Database("myapp", options.Database().SetReadPreference(readPref))
 **1. Update import statements:**
 ```go
 // Old
-import "github.com/go-fork/providers/mongodb"
+import "go.fork.vn/mongodb"
 
 // New  
 import "go.fork.vn/mongodb"
