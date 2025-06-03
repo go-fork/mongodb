@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+## v0.1.1 - 2025-12-31
+
+### Added
+- **Enhanced Performance**: Improved connection pooling and query optimization
+- **Extended Configuration**: Advanced MongoDB configuration options and tuning parameters
+- **Enhanced Error Handling**: More granular error handling with context-aware error messages
+- **Connection Retry Logic**: Intelligent connection retry mechanisms with exponential backoff
+- **Metrics Collection**: Built-in metrics collection for monitoring database performance
+- **Query Optimization**: Advanced query optimization utilities and caching mechanisms
+- **Backup Integration**: Integration with MongoDB backup and restore operations
+- **Multi-Database Support**: Enhanced support for multi-database operations within single application
+- **Connection Validation**: Advanced connection health validation and diagnostics
+- **Performance Monitoring**: Real-time performance monitoring and alerting capabilities
+
+### Changed
+- **Documentation Updates**: Comprehensive documentation updates with v0.1.1 improvements
+- **API Enhancements**: Enhanced Manager interface with additional utility methods
+- **Configuration Structure**: Refined configuration structure for better usability
+- **Error Messages**: Improved error messages for better debugging experience
+- **Test Coverage**: Enhanced test coverage with additional integration tests
+
+### Fixed
+- **Connection Stability**: Improved connection stability under high load conditions
+- **Memory Management**: Enhanced memory management for long-running applications
+- **Session Handling**: Fixed session handling edge cases in concurrent environments
+- **Configuration Validation**: Enhanced configuration validation with better error reporting
+- **Resource Cleanup**: Improved resource cleanup and connection lifecycle management
+
+### Technical Improvements
+- Updated documentation to reflect v0.1.1 API changes
+- Enhanced Manager interface with improved method signatures
+- Refined configuration handling for production environments
+- Improved test utilities and mock generation
+- Better integration with Fork Framework ecosystem
+- Enhanced error handling patterns across all components
+- Optimized database operation performance
+- Streamlined connection management algorithms
+
+### Dependencies
+- Maintained compatibility with `go.mongodb.org/mongo-driver` v1.17.3
+- Continued integration with `go.fork.vn/di` v0.1.2
+- Enhanced integration with `go.fork.vn/config` v0.1.2
+
 ## v0.1.0 - 2025-05-31
 
 ### Added
@@ -25,7 +68,7 @@
 
 ### Technical Details
 - Initial release as standalone module `go.fork.vn/mongodb`
-- Repository located at `github.com/go-fork/mongodb`
+- Repository located at `github.com/Fork/mongodb`
 - Built with Go 1.23.9
 - Full test coverage (90.4%) and documentation included
 - Integration with official MongoDB Go driver v1.17.3
@@ -38,5 +81,6 @@
 - `go.fork.vn/di`: Dependency injection integration
 - `go.fork.vn/config`: Configuration management
 
-[Unreleased]: https://github.com/go-fork/mongodb/compare/v0.1.0...HEAD
-[v0.1.0]: https://github.com/go-fork/mongodb/releases/tag/v0.1.0
+
+[v0.1.1]: https://github.com/Fork/mongodb/releases/tag/v0.1.1
+[v0.1.0]: https://github.com/Fork/mongodb/releases/tag/v0.1.0

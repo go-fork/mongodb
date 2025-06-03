@@ -456,7 +456,6 @@ func (m *manager) Stats(ctx context.Context) (map[string]interface{}, error) {
 
 // ListCollections returns a list of collection names in the default database
 func (m *manager) ListCollections(ctx context.Context) ([]string, error) {
-
 	return m.database.ListCollectionNames(ctx, map[string]interface{}{})
 }
 

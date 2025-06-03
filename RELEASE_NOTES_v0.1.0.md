@@ -6,7 +6,7 @@
 ## 🚀 Major Changes
 
 ### Module Migration
-- **BREAKING CHANGE**: Migrated module path from `github.com/go-fork/providers/mongodb` to `go.fork.vn/mongodb`
+- **BREAKING CHANGE**: Migrated module path from `github.com/Fork/providers/mongodb` to `go.fork.vn/mongodb`
 - All import statements must be updated to use the new module path
 - This marks the transition to the official go.fork.vn domain
 
@@ -86,7 +86,7 @@ require (
 
 ### Find and Replace
 Use your IDE's find and replace functionality:
-- Find: `github.com/go-fork/providers/mongodb`
+- Find: `github.com/Fork/providers/mongodb`
 - Replace: `go.fork.vn/mongodb`
 
 ## 📋 What's Next
@@ -115,4 +115,4 @@ This release maintains all existing functionality while establishing the foundat
 
 ---
 
-**Full Changelog**: https://github.com/go-fork/providers/compare/mongodb/v0.0.1...mongodb/v0.1.0
+**Full Changelog**: https://github.com/Fork/providers/compare/mongodb/v0.0.1...mongodb/v0.1.0

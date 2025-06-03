@@ -4,8 +4,8 @@ go 1.23.9
 
 require (
 	github.com/stretchr/testify v1.10.0
-	go.fork.vn/config v0.1.0
-	go.fork.vn/di v0.1.0
+	go.fork.vn/config v0.1.2
+	go.fork.vn/di v0.1.2
 	go.mongodb.org/mongo-driver v1.17.3
 )
 
@@ -21,7 +21,7 @@ require (
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.14.0 // indirect
-	github.com/spf13/cast v1.8.0 // indirect
+	github.com/spf13/cast v1.9.2 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/spf13/viper v1.20.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect

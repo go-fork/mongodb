@@ -1,79 +1,28 @@
-# MongoDB Provider Usage Guide
+# Hướng Dẫn Sử Dụng MongoDB Provider v0.1.1
 
-## Quick Start
+## Bắt Đầu Nhanh
 
-### 1. Basic Installation & Setup
-
-```bash
-# Install package
-go get go.fork.vn/mongodb@v0.1.0
-```
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "log"
-    
-    "go.fork.vn/mongodb"
-)
-
-func main() {
-    // Create configuration
-    config := &mongodb.Config{
-        URI:      "mongodb://localhost:27017",
-        Database: "myapp",
-    }
-    
-    // Create manager
-    manager := mongodb.NewManager(config)
-    defer manager.Disconnect(context.Background())
-    
-    // Test connection
-    ctx := context.Background()
-    if err := manager.Ping(ctx); err != nil {
-        log.Fatal("Failed to ping MongoDB:", err)
-    }
-    
-    fmt.Println("Connected to MongoDB successfully!")
-}
-```
-
-### 2. Configuration với Environment Variables
+### 1. Cài Đặt Package
 
 ```bash
-# .env file
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=myapp
-MONGODB_MAX_POOL_SIZE=50
+go get go.fork.vn/mongodb@v0.1.1
 ```
 
-```go
-import (
-    "go.fork.vn/config"
-    "go.fork.vn/mongodb"
-)
+### 2. Cấu Hình Cơ Bản
 
-func setupMongoDB() mongodb.Manager {
-    // Load config từ environment
-    configManager := config.NewManager()
-    configManager.LoadFromEnv()
-    
-    // Parse MongoDB config
-    var mongoConfig mongodb.Config
-    if err := configManager.UnmarshalKey("mongodb", &mongoConfig); err != nil {
-        log.Fatal("Failed to parse MongoDB config:", err)
-    }
-    
-    return mongodb.NewManager(&mongoConfig)
-}
+Tạo file `configs/app.yaml`:
+
+```yaml
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "myapp"
+  max_pool_size: 100
+  min_pool_size: 10
+  connect_timeout: "10s"
+  server_selection_timeout: "30s"
 ```
 
-## Dependency Injection Integration
-
-### 1. Complete DI Setup
+### 3. Khởi Tạo Ứng Dụng
 
 ```go
 package main
@@ -82,306 +31,432 @@ import (
     "context"
     "log"
     
-    "go.fork.vn/di"
-    "go.fork.vn/config"
+    "go.fork.vn/app"
     "go.fork.vn/mongodb"
 )
 
 func main() {
-    container := di.NewContainer()
+    // Khởi tạo Fork application
+    application := app.New()
     
-    // Register providers
-    container.RegisterServiceProvider(config.NewServiceProvider())
-    container.RegisterServiceProvider(mongodb.NewServiceProvider())
+    // Đăng ký MongoDB provider
+    application.RegisterProvider(&mongodb.ServiceProvider{})
     
-    // Build container
-    if err := container.Build(); err != nil {
-        log.Fatal("Failed to build container:", err)
+    // Khởi động application
+    if err := application.Boot(); err != nil {
+        log.Fatal("Failed to boot application:", err)
     }
     
-    // Use MongoDB
+    // Resolve MongoDB manager
     var mongoManager mongodb.Manager
-    if err := container.Resolve(&mongoManager); err != nil {
+    if err := application.Container().Resolve(&mongoManager); err != nil {
         log.Fatal("Failed to resolve MongoDB manager:", err)
     }
     
     // Test connection
     ctx := context.Background()
     if err := mongoManager.Ping(ctx); err != nil {
-        log.Fatal("MongoDB ping failed:", err)
+        log.Fatal("MongoDB connection failed:", err)
     }
     
-    log.Println("MongoDB ready!")
+    log.Println("✅ MongoDB connected successfully!")
+    
+    // Your application logic here
+    runApplication(mongoManager)
 }
 ```
 
-### 2. Service Layer Integration
+## Các Pattern Sử Dụng Phổ Biến
+
+### 1. CRUD Operations
+
+#### Create Documents
 
 ```go
-// models/user.go
-package models
-
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
-type User struct {
-    ID       primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-    Name     string             `bson:"name" json:"name"`
-    Email    string             `bson:"email" json:"email"`
-    Age      int                `bson:"age" json:"age"`
-    Active   bool               `bson:"active" json:"active"`
-}
-```
-
-```go
-// services/user_service.go
-package services
-
-import (
-    "context"
-    "fmt"
+func createUser(manager mongodb.Manager, user User) error {
+    ctx := context.Background()
     
-    "go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive"
-    "go.fork.vn/mongodb"
-    "yourapp/models"
-)
-
-type UserService struct {
-    mongoManager mongodb.Manager
-}
-
-func NewUserService(mongoManager mongodb.Manager) *UserService {
-    return &UserService{
-        mongoManager: mongoManager,
-    }
-}
-
-func (s *UserService) CreateUser(ctx context.Context, user *models.User) error {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
+    // Get collection
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
     if err != nil {
         return fmt.Errorf("failed to get collection: %w", err)
     }
     
+    // Insert document
     result, err := collection.InsertOne(ctx, user)
     if err != nil {
         return fmt.Errorf("failed to insert user: %w", err)
     }
     
-    user.ID = result.InsertedID.(primitive.ObjectID)
+    log.Printf("Created user with ID: %v", result.InsertedID)
     return nil
 }
 
-func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, error) {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
+// Insert multiple documents
+func createUsers(manager mongodb.Manager, users []User) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
     if err != nil {
-        return nil, fmt.Errorf("failed to get collection: %w", err)
+        return err
     }
     
-    objectID, err := primitive.ObjectIDFromHex(id)
+    // Convert to []interface{}
+    docs := make([]interface{}, len(users))
+    for i, user := range users {
+        docs[i] = user
+    }
+    
+    result, err := collection.InsertMany(ctx, docs)
+    if err != nil {
+        return fmt.Errorf("failed to insert users: %w", err)
+    }
+    
+    log.Printf("Created %d users", len(result.InsertedIDs))
+    return nil
+}
+```
+
+#### Read Documents
+
+```go
+import (
+    "go.mongodb.org/mongo-driver/bson"
+    "go.mongodb.org/mongo-driver/bson/primitive"
+    "go.mongodb.org/mongo-driver/mongo/options"
+)
+
+// Find single document
+func findUserByID(manager mongodb.Manager, userID string) (*User, error) {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return nil, err
+    }
+    
+    // Convert string ID to ObjectID
+    objectID, err := primitive.ObjectIDFromHex(userID)
     if err != nil {
         return nil, fmt.Errorf("invalid user ID: %w", err)
     }
     
-    var user models.User
+    var user User
     err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
     if err != nil {
+        if err == mongo.ErrNoDocuments {
+            return nil, fmt.Errorf("user not found")
+        }
         return nil, fmt.Errorf("failed to find user: %w", err)
     }
     
     return &user, nil
 }
 
-func (s *UserService) UpdateUser(ctx context.Context, id string, updates bson.M) error {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
+// Find multiple documents with filters
+func findUsersByAge(manager mongodb.Manager, minAge, maxAge int) ([]User, error) {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
     if err != nil {
-        return fmt.Errorf("failed to get collection: %w", err)
+        return nil, err
     }
     
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        return fmt.Errorf("invalid user ID: %w", err)
+    // Build filter
+    filter := bson.M{
+        "age": bson.M{
+            "$gte": minAge,
+            "$lte": maxAge,
+        },
     }
     
-    _, err = collection.UpdateOne(
-        ctx,
-        bson.M{"_id": objectID},
-        bson.M{"$set": updates},
-    )
-    if err != nil {
-        return fmt.Errorf("failed to update user: %w", err)
-    }
+    // Set options
+    opts := options.Find().SetSort(bson.D{{"name", 1}}).SetLimit(100)
     
-    return nil
-}
-
-func (s *UserService) DeleteUser(ctx context.Context, id string) error {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
-    if err != nil {
-        return fmt.Errorf("failed to get collection: %w", err)
-    }
-    
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        return fmt.Errorf("invalid user ID: %w", err)
-    }
-    
-    _, err = collection.DeleteOne(ctx, bson.M{"_id": objectID})
-    if err != nil {
-        return fmt.Errorf("failed to delete user: %w", err)
-    }
-    
-    return nil
-}
-
-func (s *UserService) ListUsers(ctx context.Context, limit int64) ([]*models.User, error) {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
-    if err != nil {
-        return nil, fmt.Errorf("failed to get collection: %w", err)
-    }
-    
-    cursor, err := collection.Find(ctx, bson.M{}, 
-        options.Find().SetLimit(limit))
+    cursor, err := collection.Find(ctx, filter, opts)
     if err != nil {
         return nil, fmt.Errorf("failed to find users: %w", err)
     }
     defer cursor.Close(ctx)
     
-    var users []*models.User
+    var users []User
     if err = cursor.All(ctx, &users); err != nil {
         return nil, fmt.Errorf("failed to decode users: %w", err)
     }
     
     return users, nil
 }
-```
 
-### 3. Register Services với DI
-
-```go
-// main.go
-package main
-
-import (
-    "go.fork.vn/di"
-    "yourapp/services"
-)
-
-func main() {
-    container := di.NewContainer()
-    
-    // Register providers
-    container.RegisterServiceProvider(config.NewServiceProvider())
-    container.RegisterServiceProvider(mongodb.NewServiceProvider())
-    
-    // Register services
-    container.RegisterSingleton(func(mongoManager mongodb.Manager) *services.UserService {
-        return services.NewUserService(mongoManager)
-    })
-    
-    // Build container
-    if err := container.Build(); err != nil {
-        log.Fatal("Failed to build container:", err)
-    }
-    
-    // Use service
-    var userService *services.UserService
-    if err := container.Resolve(&userService); err != nil {
-        log.Fatal("Failed to resolve user service:", err)
-    }
-    
-    // Create user
+// Pagination example
+func findUsersWithPagination(manager mongodb.Manager, page, pageSize int) ([]User, error) {
     ctx := context.Background()
-    user := &models.User{
-        Name:   "John Doe",
-        Email:  "john@example.com",
-        Age:    30,
-        Active: true,
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return nil, err
     }
     
-    if err := userService.CreateUser(ctx, user); err != nil {
-        log.Fatal("Failed to create user:", err)
+    skip := (page - 1) * pageSize
+    opts := options.Find().
+        SetSkip(int64(skip)).
+        SetLimit(int64(pageSize)).
+        SetSort(bson.D{{"created_at", -1}})
+    
+    cursor, err := collection.Find(ctx, bson.M{}, opts)
+    if err != nil {
+        return nil, err
+    }
+    defer cursor.Close(ctx)
+    
+    var users []User
+    if err = cursor.All(ctx, &users); err != nil {
+        return nil, err
     }
     
-    log.Printf("Created user with ID: %s", user.ID.Hex())
+    return users, nil
 }
 ```
 
-## Configuration Examples
-
-### 1. Development Configuration
-
-```yaml
-# config/app.yaml
-mongodb:
-  uri: "mongodb://localhost:27017"
-  database: "myapp_dev"
-  max_pool_size: 10
-  min_pool_size: 2
-  max_conn_idle_time: "30s"
-  connect_timeout: "10s"
-  socket_timeout: "30s"
-```
-
-### 2. Production Configuration với SSL
-
-```yaml
-# config/app.yaml
-mongodb:
-  uri: "mongodb+srv://cluster.mongodb.net"
-  database: "myapp_prod"
-  max_pool_size: 100
-  min_pool_size: 20
-  max_conn_idle_time: "60s"
-  server_selection_timeout: "30s"
-  connect_timeout: "10s"
-  socket_timeout: "30s"
-  ssl:
-    enabled: true
-    ca_file: "/etc/ssl/certs/mongodb-ca.pem"
-    certificate_file: "/etc/ssl/certs/mongodb-cert.pem"
-    private_key_file: "/etc/ssl/private/mongodb-key.pem"
-    insecure_skip_verify: false
-  auth:
-    username: "${MONGODB_USERNAME}"
-    password: "${MONGODB_PASSWORD}"
-    auth_db: "admin"
-```
-
-### 3. Environment Variables Setup
-
-```bash
-# .env
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net
-MONGODB_DATABASE=myapp_prod
-MONGODB_MAX_POOL_SIZE=100
-MONGODB_MIN_POOL_SIZE=20
-MONGODB_MAX_CONN_IDLE_TIME=60s
-MONGODB_SERVER_SELECTION_TIMEOUT=30s
-MONGODB_CONNECT_TIMEOUT=10s
-MONGODB_SOCKET_TIMEOUT=30s
-
-# SSL Settings
-MONGODB_SSL_ENABLED=true
-MONGODB_SSL_CA_FILE=/etc/ssl/certs/mongodb-ca.pem
-MONGODB_SSL_CERTIFICATE_FILE=/etc/ssl/certs/mongodb-cert.pem
-MONGODB_SSL_PRIVATE_KEY_FILE=/etc/ssl/private/mongodb-key.pem
-MONGODB_SSL_INSECURE_SKIP_VERIFY=false
-
-# Authentication
-MONGODB_AUTH_USERNAME=admin
-MONGODB_AUTH_PASSWORD=password123
-MONGODB_AUTH_DB=admin
-```
-
-## Advanced Operations
-
-### 1. Transactions
+#### Update Documents
 
 ```go
-func (s *UserService) TransferCredits(ctx context.Context, fromUserID, toUserID string, amount int) error {
-    client, err := s.mongoManager.GetClient(ctx)
+// Update single document
+func updateUser(manager mongodb.Manager, userID string, updates bson.M) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
     if err != nil {
-        return fmt.Errorf("failed to get client: %w", err)
+        return err
+    }
+    
+    objectID, err := primitive.ObjectIDFromHex(userID)
+    if err != nil {
+        return fmt.Errorf("invalid user ID: %w", err)
+    }
+    
+    filter := bson.M{"_id": objectID}
+    update := bson.M{
+        "$set": updates,
+        "$currentDate": bson.M{"updated_at": true},
+    }
+    
+    result, err := collection.UpdateOne(ctx, filter, update)
+    if err != nil {
+        return fmt.Errorf("failed to update user: %w", err)
+    }
+    
+    if result.MatchedCount == 0 {
+        return fmt.Errorf("user not found")
+    }
+    
+    log.Printf("Updated user %s", userID)
+    return nil
+}
+
+// Update multiple documents
+func updateUsersByStatus(manager mongodb.Manager, oldStatus, newStatus string) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    filter := bson.M{"status": oldStatus}
+    update := bson.M{
+        "$set": bson.M{
+            "status": newStatus,
+            "updated_at": time.Now(),
+        },
+    }
+    
+    result, err := collection.UpdateMany(ctx, filter, update)
+    if err != nil {
+        return fmt.Errorf("failed to update users: %w", err)
+    }
+    
+    log.Printf("Updated %d users from %s to %s", result.ModifiedCount, oldStatus, newStatus)
+    return nil
+}
+
+// Upsert example
+func upsertUser(manager mongodb.Manager, user User) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    filter := bson.M{"email": user.Email}
+    update := bson.M{
+        "$set": user,
+        "$setOnInsert": bson.M{"created_at": time.Now()},
+        "$currentDate": bson.M{"updated_at": true},
+    }
+    
+    opts := options.Update().SetUpsert(true)
+    
+    result, err := collection.UpdateOne(ctx, filter, update, opts)
+    if err != nil {
+        return fmt.Errorf("failed to upsert user: %w", err)
+    }
+    
+    if result.UpsertedCount > 0 {
+        log.Printf("Created new user: %v", result.UpsertedID)
+    } else {
+        log.Printf("Updated existing user")
+    }
+    
+    return nil
+}
+```
+
+#### Delete Documents
+
+```go
+// Delete single document
+func deleteUser(manager mongodb.Manager, userID string) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    objectID, err := primitive.ObjectIDFromHex(userID)
+    if err != nil {
+        return fmt.Errorf("invalid user ID: %w", err)
+    }
+    
+    result, err := collection.DeleteOne(ctx, bson.M{"_id": objectID})
+    if err != nil {
+        return fmt.Errorf("failed to delete user: %w", err)
+    }
+    
+    if result.DeletedCount == 0 {
+        return fmt.Errorf("user not found")
+    }
+    
+    log.Printf("Deleted user %s", userID)
+    return nil
+}
+
+// Delete multiple documents
+func deleteInactiveUsers(manager mongodb.Manager, days int) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    cutoff := time.Now().AddDate(0, 0, -days)
+    filter := bson.M{
+        "last_login": bson.M{"$lt": cutoff},
+        "status": "inactive",
+    }
+    
+    result, err := collection.DeleteMany(ctx, filter)
+    if err != nil {
+        return fmt.Errorf("failed to delete inactive users: %w", err)
+    }
+    
+    log.Printf("Deleted %d inactive users", result.DeletedCount)
+    return nil
+}
+```
+
+### 2. Aggregation Pipeline
+
+```go
+import "go.mongodb.org/mongo-driver/mongo"
+
+// Group users by age and count
+func getUserCountByAge(manager mongodb.Manager) ([]bson.M, error) {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return nil, err
+    }
+    
+    pipeline := mongo.Pipeline{
+        {{"$group", bson.D{
+            {"_id", "$age"},
+            {"count", bson.D{{"$sum", 1}}},
+            {"avg_score", bson.D{{"$avg", "$score"}}},
+        }}},
+        {{"$sort", bson.D{{"_id", 1}}}},
+    }
+    
+    cursor, err := collection.Aggregate(ctx, pipeline)
+    if err != nil {
+        return nil, fmt.Errorf("aggregation failed: %w", err)
+    }
+    defer cursor.Close(ctx)
+    
+    var results []bson.M
+    if err = cursor.All(ctx, &results); err != nil {
+        return nil, fmt.Errorf("failed to decode results: %w", err)
+    }
+    
+    return results, nil
+}
+
+// Complex aggregation with lookup
+func getUsersWithOrders(manager mongodb.Manager) ([]bson.M, error) {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return nil, err
+    }
+    
+    pipeline := mongo.Pipeline{
+        {{"$lookup", bson.D{
+            {"from", "orders"},
+            {"localField", "_id"},
+            {"foreignField", "user_id"},
+            {"as", "orders"},
+        }}},
+        {{"$addFields", bson.D{
+            {"total_orders", bson.D{{"$size", "$orders"}}},
+            {"total_amount", bson.D{{"$sum", "$orders.amount"}}},
+        }}},
+        {{"$match", bson.D{
+            {"total_orders", bson.D{{"$gt", 0}}},
+        }}},
+        {{"$sort", bson.D{{"total_amount", -1}}}},
+        {{"$limit", 100}},
+    }
+    
+    cursor, err := collection.Aggregate(ctx, pipeline)
+    if err != nil {
+        return nil, fmt.Errorf("aggregation failed: %w", err)
+    }
+    defer cursor.Close(ctx)
+    
+    var results []bson.M
+    if err = cursor.All(ctx, &results); err != nil {
+        return nil, err
+    }
+    
+    return results, nil
+}
+```
+
+### 3. Transactions
+
+```go
+import "go.mongodb.org/mongo-driver/mongo"
+
+func transferMoney(manager mongodb.Manager, fromUserID, toUserID string, amount float64) error {
+    ctx := context.Background()
+    
+    client, err := manager.GetClient(ctx)
+    if err != nil {
+        return err
     }
     
     // Start session
@@ -391,141 +466,232 @@ func (s *UserService) TransferCredits(ctx context.Context, fromUserID, toUserID 
     }
     defer session.EndSession(ctx)
     
-    // Execute transaction
-    _, err = session.WithTransaction(ctx, func(sc mongo.SessionContext) (interface{}, error) {
-        collection, err := s.mongoManager.GetCollection(sc, "myapp", "users")
+    // Define transaction function
+    callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+        usersCollection, err := manager.GetCollection(sessCtx, "myapp", "users")
         if err != nil {
             return nil, err
         }
         
         // Deduct from sender
-        fromObjID, _ := primitive.ObjectIDFromHex(fromUserID)
-        _, err = collection.UpdateOne(sc, 
-            bson.M{"_id": fromObjID}, 
-            bson.M{"$inc": bson.M{"credits": -amount}})
+        fromFilter := bson.M{"_id": fromUserID, "balance": bson.M{"$gte": amount}}
+        fromUpdate := bson.M{"$inc": bson.M{"balance": -amount}}
+        
+        fromResult, err := usersCollection.UpdateOne(sessCtx, fromFilter, fromUpdate)
         if err != nil {
-            return nil, fmt.Errorf("failed to deduct credits: %w", err)
+            return nil, fmt.Errorf("failed to deduct from sender: %w", err)
+        }
+        
+        if fromResult.ModifiedCount == 0 {
+            return nil, fmt.Errorf("insufficient balance or sender not found")
         }
         
         // Add to receiver
-        toObjID, _ := primitive.ObjectIDFromHex(toUserID)
-        _, err = collection.UpdateOne(sc, 
-            bson.M{"_id": toObjID}, 
-            bson.M{"$inc": bson.M{"credits": amount}})
+        toFilter := bson.M{"_id": toUserID}
+        toUpdate := bson.M{"$inc": bson.M{"balance": amount}}
+        
+        toResult, err := usersCollection.UpdateOne(sessCtx, toFilter, toUpdate)
         if err != nil {
-            return nil, fmt.Errorf("failed to add credits: %w", err)
+            return nil, fmt.Errorf("failed to add to receiver: %w", err)
+        }
+        
+        if toResult.ModifiedCount == 0 {
+            return nil, fmt.Errorf("receiver not found")
+        }
+        
+        // Record transaction
+        transactionsCollection, err := manager.GetCollection(sessCtx, "myapp", "transactions")
+        if err != nil {
+            return nil, err
+        }
+        
+        transaction := bson.M{
+            "from_user_id": fromUserID,
+            "to_user_id":   toUserID,
+            "amount":       amount,
+            "timestamp":    time.Now(),
+            "status":       "completed",
+        }
+        
+        _, err = transactionsCollection.InsertOne(sessCtx, transaction)
+        if err != nil {
+            return nil, fmt.Errorf("failed to record transaction: %w", err)
         }
         
         return nil, nil
-    })
+    }
     
-    return err
+    // Execute transaction with retry
+    _, err = session.WithTransaction(ctx, callback)
+    if err != nil {
+        return fmt.Errorf("transaction failed: %w", err)
+    }
+    
+    log.Printf("Successfully transferred %.2f from %s to %s", amount, fromUserID, toUserID)
+    return nil
 }
 ```
 
-### 2. Aggregation Pipeline
+### 4. Indexes
 
 ```go
-func (s *UserService) GetUserStats(ctx context.Context) (*UserStats, error) {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
+import (
+    "go.mongodb.org/mongo-driver/mongo"
+    "go.mongodb.org/mongo-driver/mongo/options"
+)
+
+func createIndexes(manager mongodb.Manager) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
     if err != nil {
-        return nil, fmt.Errorf("failed to get collection: %w", err)
+        return err
     }
     
-    pipeline := []bson.M{
-        {"$group": bson.M{
-            "_id": nil,
-            "total_users": bson.M{"$sum": 1},
-            "active_users": bson.M{
-                "$sum": bson.M{
-                    "$cond": []interface{}{
-                        "$active", 1, 0,
-                    },
-                },
-            },
-            "avg_age": bson.M{"$avg": "$age"},
-            "max_age": bson.M{"$max": "$age"},
-            "min_age": bson.M{"$min": "$age"},
-        }},
+    // Single field index
+    emailIndex := mongo.IndexModel{
+        Keys:    bson.D{{"email", 1}},
+        Options: options.Index().SetUnique(true).SetBackground(true),
     }
     
-    cursor, err := collection.Aggregate(ctx, pipeline)
+    // Compound index
+    nameAgeIndex := mongo.IndexModel{
+        Keys: bson.D{
+            {"name", 1},
+            {"age", -1},
+        },
+        Options: options.Index().SetBackground(true),
+    }
+    
+    // Text index
+    textIndex := mongo.IndexModel{
+        Keys: bson.D{
+            {"name", "text"},
+            {"description", "text"},
+        },
+        Options: options.Index().SetBackground(true),
+    }
+    
+    // TTL index
+    ttlIndex := mongo.IndexModel{
+        Keys:    bson.D{{"expires_at", 1}},
+        Options: options.Index().SetExpireAfterSeconds(0).SetBackground(true),
+    }
+    
+    indexes := []mongo.IndexModel{emailIndex, nameAgeIndex, textIndex, ttlIndex}
+    
+    names, err := collection.Indexes().CreateMany(ctx, indexes)
     if err != nil {
-        return nil, fmt.Errorf("failed to aggregate: %w", err)
+        return fmt.Errorf("failed to create indexes: %w", err)
+    }
+    
+    log.Printf("Created indexes: %v", names)
+    return nil
+}
+
+// List existing indexes
+func listIndexes(manager mongodb.Manager) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    cursor, err := collection.Indexes().List(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to list indexes: %w", err)
     }
     defer cursor.Close(ctx)
     
-    var results []bson.M
-    if err = cursor.All(ctx, &results); err != nil {
-        return nil, fmt.Errorf("failed to decode results: %w", err)
+    var indexes []bson.M
+    if err = cursor.All(ctx, &indexes); err != nil {
+        return fmt.Errorf("failed to decode indexes: %w", err)
     }
     
-    if len(results) == 0 {
-        return &UserStats{}, nil
-    }
-    
-    result := results[0]
-    return &UserStats{
-        TotalUsers:  result["total_users"].(int32),
-        ActiveUsers: result["active_users"].(int32),
-        AvgAge:      result["avg_age"].(float64),
-        MaxAge:      result["max_age"].(int32),
-        MinAge:      result["min_age"].(int32),
-    }, nil
-}
-
-type UserStats struct {
-    TotalUsers  int32   `json:"total_users"`
-    ActiveUsers int32   `json:"active_users"`
-    AvgAge      float64 `json:"avg_age"`
-    MaxAge      int32   `json:"max_age"`
-    MinAge      int32   `json:"min_age"`
-}
-```
-
-### 3. Indexing
-
-```go
-func (s *UserService) EnsureIndexes(ctx context.Context) error {
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
-    if err != nil {
-        return fmt.Errorf("failed to get collection: %w", err)
-    }
-    
-    indexes := []mongo.IndexModel{
-        {
-            Keys:    bson.D{{Key: "email", Value: 1}},
-            Options: options.Index().SetUnique(true),
-        },
-        {
-            Keys: bson.D{
-                {Key: "name", Value: 1},
-                {Key: "age", Value: -1},
-            },
-        },
-        {
-            Keys: bson.D{{Key: "active", Value: 1}},
-            Options: options.Index().SetPartialFilterExpression(
-                bson.M{"active": true},
-            ),
-        },
-    }
-    
-    _, err = collection.Indexes().CreateMany(ctx, indexes)
-    if err != nil {
-        return fmt.Errorf("failed to create indexes: %w", err)
+    for _, index := range indexes {
+        log.Printf("Index: %+v", index)
     }
     
     return nil
 }
 ```
 
-## Testing Examples
+## Cấu Hình Nâng Cao
 
-### 1. Unit Testing với Mocks
+### 1. SSL/TLS Configuration
+
+```yaml
+# configs/app.yaml
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "myapp"
+  ssl:
+    enabled: true
+    ca_file: "/etc/ssl/certs/mongodb-ca.pem"
+    certificate_file: "/etc/ssl/certs/mongodb-client.pem"
+    private_key_file: "/etc/ssl/private/mongodb-client-key.pem"
+    insecure_skip_verify: false
+```
+
+### 2. Replica Set Configuration
+
+```yaml
+mongodb:
+  uri: "mongodb://host1:27017,host2:27017,host3:27017/?replicaSet=rs0"
+  database: "myapp"
+  max_pool_size: 200
+  min_pool_size: 20
+  server_selection_timeout: "60s"
+```
+
+### 3. Authentication
+
+```yaml
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "myapp"
+  auth:
+    username: "app_user"
+    password: "secure_password"
+    auth_db: "admin"
+```
+
+### 4. Environment Variables
+
+```bash
+# Connection
+export MONGODB_URI="mongodb://localhost:27017"
+export MONGODB_DATABASE="myapp"
+
+# Pool settings
+export MONGODB_MAX_POOL_SIZE=100
+export MONGODB_MIN_POOL_SIZE=10
+export MONGODB_MAX_CONN_IDLE_TIME="30s"
+
+# Timeouts
+export MONGODB_SERVER_SELECTION_TIMEOUT="30s"
+export MONGODB_CONNECT_TIMEOUT="10s"
+export MONGODB_SOCKET_TIMEOUT="30s"
+
+# SSL
+export MONGODB_SSL_ENABLED=true
+export MONGODB_SSL_CA_FILE="/path/to/ca.pem"
+export MONGODB_SSL_CERTIFICATE_FILE="/path/to/cert.pem"
+export MONGODB_SSL_PRIVATE_KEY_FILE="/path/to/key.pem"
+
+# Authentication
+export MONGODB_AUTH_USERNAME="admin"
+export MONGODB_AUTH_PASSWORD="password123"
+export MONGODB_AUTH_DB="admin"
+```
+
+## Testing Patterns
+
+### 1. Unit Tests với Mocks
 
 ```go
-package services_test
+package service_test
 
 import (
     "context"
@@ -536,266 +702,445 @@ import (
     "go.mongodb.org/mongo-driver/mongo"
     
     "go.fork.vn/mongodb/mocks"
-    "yourapp/models"
-    "yourapp/services"
+    "your-app/service"
 )
 
 func TestUserService_CreateUser(t *testing.T) {
     // Setup mock
-    mockManager := &mocks.Manager{}
-    mockCollection := &mongo.Collection{} // Mock this too
+    mockManager := &mocks.MockManager{}
+    mockCollection := &mongo.Collection{} // mock này cần setup riêng
     
+    // Setup expectations
     mockManager.On("GetCollection", mock.Anything, "myapp", "users").
         Return(mockCollection, nil)
     
     // Test service
-    service := services.NewUserService(mockManager)
+    userService := service.NewUserService(mockManager)
     
-    user := &models.User{
-        Name:   "Test User",
-        Email:  "test@example.com",
-        Age:    25,
-        Active: true,
+    user := &User{
+        Name:  "John Doe",
+        Email: "john@example.com",
     }
     
-    err := service.CreateUser(context.Background(), user)
+    err := userService.CreateUser(context.Background(), user)
     
+    // Assertions
     assert.NoError(t, err)
     mockManager.AssertExpectations(t)
 }
 ```
 
-### 2. Integration Testing
+### 2. Integration Tests
 
 ```go
-package integration_test
-
-import (
-    "context"
-    "testing"
+func TestMongoDBIntegration(t *testing.T) {
+    // Skip if not integration test
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
     
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-    
-    "go.fork.vn/mongodb"
-    "yourapp/models"
-    "yourapp/services"
-)
-
-func TestUserService_Integration(t *testing.T) {
-    // Setup test MongoDB
+    // Setup test database
     config := &mongodb.Config{
         URI:      "mongodb://localhost:27017",
         Database: "test_db",
     }
     
     manager := mongodb.NewManager(config)
-    defer manager.Disconnect(context.Background())
+    ctx := context.Background()
     
     // Test connection
-    ctx := context.Background()
-    require.NoError(t, manager.Ping(ctx))
+    err := manager.Ping(ctx)
+    assert.NoError(t, err)
     
-    // Create service
-    service := services.NewUserService(manager)
+    // Test operations
+    collection, err := manager.GetCollection(ctx, "test_db", "test_collection")
+    assert.NoError(t, err)
     
-    // Test create user
-    user := &models.User{
-        Name:   "Integration Test User",
-        Email:  "integration@test.com",
-        Age:    30,
-        Active: true,
-    }
+    // Cleanup
+    defer func() {
+        collection.Drop(ctx)
+        manager.Disconnect(ctx)
+    }()
     
-    err := service.CreateUser(ctx, user)
-    require.NoError(t, err)
-    require.NotEmpty(t, user.ID)
-    
-    // Test get user
-    retrievedUser, err := service.GetUser(ctx, user.ID.Hex())
-    require.NoError(t, err)
-    assert.Equal(t, user.Name, retrievedUser.Name)
-    assert.Equal(t, user.Email, retrievedUser.Email)
-    
-    // Test update user
-    err = service.UpdateUser(ctx, user.ID.Hex(), bson.M{"age": 31})
-    require.NoError(t, err)
-    
-    // Verify update
-    updatedUser, err := service.GetUser(ctx, user.ID.Hex())
-    require.NoError(t, err)
-    assert.Equal(t, 31, updatedUser.Age)
-    
-    // Test delete user
-    err = service.DeleteUser(ctx, user.ID.Hex())
-    require.NoError(t, err)
-    
-    // Verify deletion
-    _, err = service.GetUser(ctx, user.ID.Hex())
-    assert.Error(t, err) // Should not find user
+    // Test insert
+    doc := bson.M{"name": "test", "value": 123}
+    result, err := collection.InsertOne(ctx, doc)
+    assert.NoError(t, err)
+    assert.NotNil(t, result.InsertedID)
 }
 ```
 
-## Health Checks
-
-### 1. Basic Health Check
+### 3. Test Helpers
 
 ```go
-func (s *UserService) HealthCheck(ctx context.Context) error {
-    // Check MongoDB connection
-    if !s.mongoManager.IsConnected(ctx) {
-        return errors.New("mongodb not connected")
+package testutil
+
+import (
+    "context"
+    "fmt"
+    "testing"
+    
+    "go.fork.vn/mongodb"
+)
+
+func SetupTestDB(t *testing.T) mongodb.Manager {
+    config := &mongodb.Config{
+        URI:      getTestMongoURI(),
+        Database: fmt.Sprintf("test_%s", t.Name()),
     }
     
-    // Ping database
-    if err := s.mongoManager.Ping(ctx); err != nil {
-        return fmt.Errorf("mongodb ping failed: %w", err)
+    manager := mongodb.NewManager(config)
+    
+    // Test connection
+    ctx := context.Background()
+    if err := manager.Ping(ctx); err != nil {
+        t.Fatalf("Failed to connect to test MongoDB: %v", err)
+    }
+    
+    return manager
+}
+
+func CleanupTestDB(t *testing.T, manager mongodb.Manager) {
+    ctx := context.Background()
+    
+    // Drop test database
+    client, err := manager.GetClient(ctx)
+    if err != nil {
+        t.Logf("Failed to get client for cleanup: %v", err)
+        return
+    }
+    
+    dbName := fmt.Sprintf("test_%s", t.Name())
+    if err := client.Database(dbName).Drop(ctx); err != nil {
+        t.Logf("Failed to drop test database: %v", err)
+    }
+    
+    // Disconnect
+    if err := manager.Disconnect(ctx); err != nil {
+        t.Logf("Failed to disconnect: %v", err)
+    }
+}
+
+func getTestMongoURI() string {
+    uri := os.Getenv("TEST_MONGODB_URI")
+    if uri == "" {
+        uri = "mongodb://localhost:27017"
+    }
+    return uri
+}
+```
+
+## Performance Optimization
+
+### 1. Connection Pool Tuning
+
+```yaml
+mongodb:
+  max_pool_size: 100        # Điều chỉnh theo concurrent requests
+  min_pool_size: 10         # Maintain minimum connections
+  max_conn_idle_time: "30s" # Release idle connections
+  server_selection_timeout: "30s"
+  connect_timeout: "10s"
+  socket_timeout: "30s"
+```
+
+### 2. Query Optimization
+
+```go
+// Use projection để giảm data transfer
+func findUsersProjection(manager mongodb.Manager) ([]bson.M, error) {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return nil, err
+    }
+    
+    // Only select needed fields
+    opts := options.Find().SetProjection(bson.M{
+        "name":  1,
+        "email": 1,
+        "_id":   0,
+    })
+    
+    cursor, err := collection.Find(ctx, bson.M{}, opts)
+    if err != nil {
+        return nil, err
+    }
+    defer cursor.Close(ctx)
+    
+    var results []bson.M
+    if err = cursor.All(ctx, &results); err != nil {
+        return nil, err
+    }
+    
+    return results, nil
+}
+
+// Use hints cho query optimization
+func findWithHint(manager mongodb.Manager) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    opts := options.Find().SetHint(bson.D{{"email", 1}})
+    
+    cursor, err := collection.Find(ctx, bson.M{"email": "john@example.com"}, opts)
+    if err != nil {
+        return err
+    }
+    defer cursor.Close(ctx)
+    
+    return nil
+}
+```
+
+### 3. Bulk Operations
+
+```go
+// Bulk insert
+func bulkInsertUsers(manager mongodb.Manager, users []User) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    // Convert to []interface{}
+    docs := make([]interface{}, len(users))
+    for i, user := range users {
+        docs[i] = user
+    }
+    
+    // Use bulk insert
+    result, err := collection.InsertMany(ctx, docs)
+    if err != nil {
+        return fmt.Errorf("bulk insert failed: %w", err)
+    }
+    
+    log.Printf("Inserted %d documents", len(result.InsertedIDs))
+    return nil
+}
+
+// Bulk write operations
+func bulkWriteOperations(manager mongodb.Manager) error {
+    ctx := context.Background()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    operations := []mongo.WriteModel{
+        mongo.NewInsertOneModel().SetDocument(bson.M{"name": "Alice", "age": 25}),
+        mongo.NewUpdateOneModel().SetFilter(bson.M{"name": "Bob"}).
+            SetUpdate(bson.M{"$set": bson.M{"age": 30}}),
+        mongo.NewDeleteOneModel().SetFilter(bson.M{"name": "Charlie"}),
+    }
+    
+    opts := options.BulkWrite().SetOrdered(false)
+    result, err := collection.BulkWrite(ctx, operations, opts)
+    if err != nil {
+        return fmt.Errorf("bulk write failed: %w", err)
+    }
+    
+    log.Printf("Bulk write results: %+v", result)
+    return nil
+}
+```
+
+## Error Handling Best Practices
+
+### 1. Context Handling
+
+```go
+func operationWithTimeout(manager mongodb.Manager) error {
+    // Create context với timeout
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return fmt.Errorf("failed to get collection: %w", err)
+    }
+    
+    // Operation sẽ timeout sau 30 giây
+    _, err = collection.InsertOne(ctx, bson.M{"name": "test"})
+    if err != nil {
+        if ctx.Err() == context.DeadlineExceeded {
+            return fmt.Errorf("operation timed out")
+        }
+        return fmt.Errorf("insert failed: %w", err)
     }
     
     return nil
 }
 ```
 
-### 2. Detailed Health Check
+### 2. Retry Logic
 
 ```go
-type HealthStatus struct {
-    MongoDB DatabaseHealth `json:"mongodb"`
-}
+import "time"
 
-type DatabaseHealth struct {
-    Status      string        `json:"status"`
-    Latency     time.Duration `json:"latency"`
-    Error       string        `json:"error,omitempty"`
-    Connected   bool          `json:"connected"`
-    Database    string        `json:"database"`
-    Collections int           `json:"collections"`
-}
-
-func (s *UserService) DetailedHealthCheck(ctx context.Context) *HealthStatus {
-    health := &HealthStatus{}
+func operationWithRetry(manager mongodb.Manager, maxRetries int) error {
+    ctx := context.Background()
     
-    start := time.Now()
-    
-    // Check connection
-    health.MongoDB.Connected = s.mongoManager.IsConnected(ctx)
-    health.MongoDB.Database = "myapp"
-    
-    if !health.MongoDB.Connected {
-        health.MongoDB.Status = "disconnected"
-        health.MongoDB.Error = "not connected to database"
-        return health
-    }
-    
-    // Ping database
-    if err := s.mongoManager.Ping(ctx); err != nil {
-        health.MongoDB.Status = "unhealthy"
-        health.MongoDB.Error = err.Error()
-        return health
-    }
-    
-    health.MongoDB.Latency = time.Since(start)
-    
-    // Get collection count
-    db, err := s.mongoManager.GetDatabase(ctx, "myapp")
-    if err != nil {
-        health.MongoDB.Status = "unhealthy"
-        health.MongoDB.Error = err.Error()
-        return health
-    }
-    
-    collections, err := db.ListCollectionNames(ctx, bson.M{})
-    if err != nil {
-        health.MongoDB.Status = "unhealthy"
-        health.MongoDB.Error = err.Error()
-        return health
-    }
-    
-    health.MongoDB.Collections = len(collections)
-    health.MongoDB.Status = "healthy"
-    
-    return health
-}
-```
-
-## Performance Monitoring
-
-### 1. Connection Pool Monitoring
-
-```go
-func (s *UserService) GetConnectionStats(ctx context.Context) map[string]interface{} {
-    client, err := s.mongoManager.GetClient(ctx)
-    if err != nil {
-        return map[string]interface{}{
-            "error": err.Error(),
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        err := performOperation(manager, ctx)
+        if err == nil {
+            return nil
+        }
+        
+        // Check if error is retryable
+        if !isRetryableError(err) {
+            return fmt.Errorf("non-retryable error: %w", err)
+        }
+        
+        if attempt < maxRetries {
+            // Exponential backoff
+            backoff := time.Duration(attempt) * time.Second
+            log.Printf("Attempt %d failed, retrying in %v: %v", attempt, backoff, err)
+            time.Sleep(backoff)
         }
     }
     
-    return map[string]interface{}{
-        "connection_string": s.mongoManager.GetConnectionString(),
-        "connected":         s.mongoManager.IsConnected(ctx),
-        // Add more stats as needed
+    return fmt.Errorf("operation failed after %d attempts", maxRetries)
+}
+
+func isRetryableError(err error) bool {
+    if err == nil {
+        return false
     }
+    
+    // Check for specific MongoDB errors that are retryable
+    if mongo.IsTimeout(err) || mongo.IsNetworkError(err) {
+        return true
+    }
+    
+    return false
+}
+
+func performOperation(manager mongodb.Manager, ctx context.Context) error {
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        return err
+    }
+    
+    _, err = collection.InsertOne(ctx, bson.M{"name": "test"})
+    return err
 }
 ```
 
-### 2. Query Performance Logging
+### 3. Graceful Shutdown
 
 ```go
-func (s *UserService) FindUsersWithLogging(ctx context.Context, filter bson.M) ([]*models.User, error) {
-    start := time.Now()
+import (
+    "os"
+    "os/signal"
+    "syscall"
+)
+
+func runApplicationWithGracefulShutdown(manager mongodb.Manager) {
+    // Setup signal handling
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
     
-    collection, err := s.mongoManager.GetCollection(ctx, "myapp", "users")
-    if err != nil {
-        return nil, err
+    // Run application
+    go func() {
+        log.Println("Application starting...")
+        // Your application logic here
+        runBusinessLogic(manager)
+    }()
+    
+    // Wait for signal
+    sig := <-sigChan
+    log.Printf("Received signal: %v", sig)
+    
+    // Graceful shutdown
+    log.Println("Shutting down gracefully...")
+    
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    
+    if err := manager.Disconnect(ctx); err != nil {
+        log.Printf("Error disconnecting from MongoDB: %v", err)
+    } else {
+        log.Println("✅ MongoDB disconnected successfully")
     }
     
-    cursor, err := collection.Find(ctx, filter)
-    if err != nil {
-        return nil, err
-    }
-    defer cursor.Close(ctx)
-    
-    var users []*models.User
-    if err = cursor.All(ctx, &users); err != nil {
-        return nil, err
-    }
-    
-    duration := time.Since(start)
-    
-    // Log query performance
-    log.Printf("Query executed in %v, returned %d users, filter: %+v", 
-        duration, len(users), filter)
-    
-    return users, nil
+    log.Println("Application stopped")
 }
 ```
 
-## Best Practices Summary
+## Monitoring và Logging
 
-### 1. Connection Management
-- Sử dụng single Manager instance
-- Implement graceful shutdown
-- Monitor connection health
+### 1. Connection Monitoring
 
-### 2. Error Handling  
-- Always check IsConnected() trước operations
-- Implement retry logic
-- Log connection events
+```go
+func monitorConnections(manager mongodb.Manager) {
+    ctx := context.Background()
+    
+    ticker := time.NewTicker(30 * time.Second)
+    defer ticker.Stop()
+    
+    for {
+        select {
+        case <-ticker.C:
+            if manager.IsConnected(ctx) {
+                log.Println("✅ MongoDB connection healthy")
+            } else {
+                log.Println("❌ MongoDB connection lost")
+                
+                // Attempt reconnection
+                if err := manager.Ping(ctx); err != nil {
+                    log.Printf("Reconnection failed: %v", err)
+                } else {
+                    log.Println("✅ MongoDB reconnected")
+                }
+            }
+        }
+    }
+}
+```
 
-### 3. Performance
-- Configure connection pool appropriately
-- Use indexes effectively
-- Monitor query performance
+### 2. Performance Metrics
 
-### 4. Security
-- Always use SSL/TLS trong production
-- Store credentials securely
-- Implement proper authentication
+```go
+import "time"
 
-### 5. Testing
-- Use mocks cho unit tests
-- Implement integration tests
-- Test error scenarios
+func operationWithMetrics(manager mongodb.Manager) error {
+    start := time.Now()
+    ctx := context.Background()
+    
+    defer func() {
+        duration := time.Since(start)
+        log.Printf("Operation completed in %v", duration)
+        
+        // Send metrics to monitoring system
+        // metrics.Timer("mongodb.operation.duration", duration)
+    }()
+    
+    collection, err := manager.GetCollection(ctx, "myapp", "users")
+    if err != nil {
+        // metrics.Counter("mongodb.errors", 1, []string{"type:connection"})
+        return err
+    }
+    
+    _, err = collection.InsertOne(ctx, bson.M{"name": "test"})
+    if err != nil {
+        // metrics.Counter("mongodb.errors", 1, []string{"type:operation"})
+        return err
+    }
+    
+    // metrics.Counter("mongodb.operations", 1, []string{"type:insert"})
+    return nil
+}
+```
 
-Đây là hướng dẫn comprehensive để sử dụng MongoDB Provider hiệu quả trong ứng dụng Go của bạn.
+---
+
+> 📘 **Tip**: Để biết thêm chi tiết về các tính năng nâng cao, tham khảo [API Reference](reference.md) và [Overview](overview.md).

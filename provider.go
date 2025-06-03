@@ -34,49 +34,44 @@ func NewServiceProvider() ServiceProvider {
 //
 // Params:
 //   - app: Interface của ứng dụng, phải cung cấp phương thức Container() để lấy container DI
-func (p *serviceProvider) Register(app interface{}) {
-	// Lấy container từ app
-	if appWithContainer, ok := app.(interface {
-		Container() *di.Container
-	}); ok {
-		c := appWithContainer.Container()
-
-		// Kiểm tra xem container có tồn tại không
-		if c == nil {
-			// Không làm gì khi không có container
-			return
-		}
-
-		// Kiểm tra xem container đã có config manager chưa
-		mongoConfig := DefaultConfig()
-		configService := c.MustMake("config").(config.Manager)
-		if configService == nil {
-			panic("MongoDB provider requires config service to be registered")
-		}
-		err := configService.UnmarshalKey("mongodb", &mongoConfig)
-		if err != nil {
-			panic("MongoDB config unmarshal error: " + err.Error())
-		}
-
-		// Tạo MongoDB manager với cấu hình
-		manager := NewManagerWithConfig(*mongoConfig) // Đăng ký manager vào container
-		c.Instance("mongodb.manager", manager)
-
-		// Đăng ký client và database instances (sẽ sử dụng lazy initialization trong manager)
-		client := manager.Client()
-		c.Instance("mongodb.client", client)
-
-		database := manager.Database()
-		c.Instance("mongodb.database", database)
-
-		// Đăng ký alias để có thể truy cập manager qua "mongodb"
-		c.Instance("mongodb", manager)
-
-		// Add to providers list - the test expects these specific entries
-		p.providers = append(p.providers, "mongodb")
-		p.providers = append(p.providers, "mongodb.client")
-		p.providers = append(p.providers, "mongodb.database")
+func (p *serviceProvider) Register(app di.Application) {
+	if app == nil {
+		panic("application cannot be nil")
 	}
+	// Lấy container từ app
+	c := app.Container()
+	// Kiểm tra xem container có tồn tại không
+	if c == nil {
+		panic("container cannot be nil")
+	}
+
+	// Kiểm tra xem container đã có config manager chưa
+	mongoConfig := DefaultConfig()
+	configService, ok := c.MustMake("config").(config.Manager)
+	if !ok {
+		panic("MongoDB provider requires config service to be registered")
+	}
+	err := configService.UnmarshalKey("mongodb", &mongoConfig)
+	if err != nil {
+		panic("MongoDB config unmarshal error: " + err.Error())
+	}
+
+	// Tạo MongoDB manager với cấu hình
+	manager := NewManagerWithConfig(*mongoConfig) // Đăng ký manager vào container
+	c.Instance("mongodb", manager)
+
+	// Đăng ký client và database instances (sẽ sử dụng lazy initialization trong manager)
+	client := manager.Client()
+	c.Instance("mongodb.client", client)
+
+	database := manager.Database()
+	c.Instance("mongodb.database", database)
+
+	// Add to providers list - the test expects these specific entries
+	p.providers = append(p.providers, "mongodb")
+	p.providers = append(p.providers, "mongodb.client")
+	p.providers = append(p.providers, "mongodb.database")
+
 }
 
 // Boot khởi động MongoDB provider.
@@ -86,8 +81,8 @@ func (p *serviceProvider) Register(app interface{}) {
 // đã được xử lý trong Register.
 //
 // Params:
-//   - app: Interface của ứng dụng
-func (p *serviceProvider) Boot(app interface{}) {
+//   - app: di.Application của ứng dụng
+func (p *serviceProvider) Boot(app di.Application) {
 	// Không cần thực hiện thêm tác vụ nào trong Boot
 	// vì cấu hình đã được xử lý trong Register
 	if app == nil {

@@ -1,23 +1,49 @@
-// Package mongodb cung cấp một service provider cho MongoDB trong framework dependency injection go-fork.
+// Packa// MongoDB Provider v0.1.1 includes the following key features:
+//   - Seamless integration with Go-Fork Framework's DI container
+//   - Advanced connection management with connection pooling
+//   - Enhanced authentication and SSL/TLS security
+//   - Transaction support with automatic retry logic
+//   - Change Streams for real-time data monitoring
+//   - Built-in health checks and connection monitoring
+//   - Comprehensive testing support with mockery integration
+//   - Configuration-driven setup with environment variable support
+//   - Performance optimizations and memory managementprovides MongoDB integration for Fork Framework v0.1.1.
 //
-// Package này tích hợp MongoDB vào ứng dụng Go thông qua cơ chế dependency injection,
-// giúp đơn giản hóa việc quản lý kết nối MongoDB và cung cấp nhiều phương thức tiện ích
-// để làm việc với cơ sở dữ liệu MongoDB.
+// This package offers comprehensive MongoDB connectivity and management through
+// the Fork Framework's dependency injection system, providing a clean and
+// efficient way to work with MongoDB databases in Go applications.
 //
-// # Tổng quan
+// # Overview
 //
-// Package mongodb cung cấp các tính năng chính sau:
-//   - Tích hợp với DI container của go-fork thông qua ServiceProvider
-//   - Quản lý kết nối MongoDB và connection pooling
-//   - Hỗ trợ xác thực và SSL/TLS
-//   - Interface đơn giản cho các thao tác MongoDB phổ biến
-//   - Hỗ trợ transaction và change streams
-//   - Các tiện ích kiểm tra sức khỏe (health check) và thống kê
-//   - Mock cho kiểm thử (testing)
+// MongoDB Provider v0.1.1 includes the following key features:
+//   - Seamless integration with Fork Framework's DI container
+//   - Advanced connection management with connection pooling
+//   - Multiple database connection support
+//   - Enhanced authentication and SSL/TLS security
+//   - Transaction support with automatic retry logic
+//   - Change Streams for real-time data monitoring
+//   - Built-in health checks and connection monitoring
+//   - Comprehensive testing support with mockery integration
+//   - Configuration-driven setup with environment variable support
+//   - Performance optimizations and memory management
 //
-// # Cấu hình
+// # Architecture
 //
-// Package mongodb có thể được cấu hình thông qua YAML hoặc trực tiếp qua code. Dưới đây là một ví dụ cấu hình YAML:
+// The MongoDB provider follows Fork Framework's service provider pattern:
+//
+//	Application
+//	    ↓
+//	ServiceProvider (mongodb.NewServiceProvider)
+//	    ↓
+//	Manager (mongodb.Manager)
+//	    ├── Connection Pool Management
+//	    ├── Database Operations
+//	    └── Health Monitoring
+//
+// # Configuration
+//
+// MongoDB can be configured through YAML configuration files or programmatically.
+// Example configuration in `configs/app.yaml`:
 //
 //	mongodb:
 //	  uri: "mongodb://localhost:27017"
@@ -27,63 +53,242 @@
 //	  min_pool_size: 5
 //	  connect_timeout: 30000
 //	  auth:
-//	    username: ""
-//	    password: ""
+//	    username: "${MONGO_USERNAME}"
+//	    password: "${MONGO_PASSWORD}"
 //	    auth_source: "admin"
 //	    auth_mechanism: "SCRAM-SHA-256"
+//	  tls:
+//	    enabled: true
+//	    cert_file: "/path/to/cert.pem"
+//	    key_file: "/path/to/key.pem"
+//	    ca_file: "/path/to/ca.pem"
 //
-// # Đăng ký Provider
+// # Service Provider Integration
 //
-// Đăng ký MongoDB provider với DI container của go-fork:
+// Register MongoDB provider with the Fork application:
 //
-//	container := di.New()
-//	mongoProvider := mongodb.NewProvider()
-//	container.Register(mongoProvider)
-//	container.Boot()
+//	import (
+//	    "go.fork.vn/app"
+//	    "go.fork.vn/config"
+//	    "go.fork.vn/mongodb"
+//	)
 //
-// # Sử dụng Manager
+//	func main() {
+//	    application := app.NewApplication()
 //
-// Sau khi đăng ký, bạn có thể truy xuất MongoDB manager từ container:
+//	    application.RegisterProviders(
+//	        config.NewServiceProvider(),
+//	        mongodb.NewServiceProvider(),
+//	    )
 //
-//	mongoManager := container.MustMake("mongodb").(mongodb.Manager)
+//	    application.Boot()
 //
-//	// Sử dụng manager
-//	ctx := context.Background()
-//	err := mongoManager.Ping(ctx)
+//	    // Use MongoDB
+//	    var manager mongodb.Manager
+//	    application.Container().Make("mongodb.manager", &manager)
+//	}
 //
-//	// Thao tác với collection
-//	collection := mongoManager.Collection("users")
-//	result, err := collection.InsertOne(ctx, bson.M{"name": "Example"})
+// # Manager Interface
 //
-// # Các dịch vụ được đăng ký
+// The Manager interface provides comprehensive MongoDB operations:
 //
-// Provider đăng ký các dịch vụ sau vào container:
-//   - "mongodb" - Instance của MongoDB Manager (kiểu mongodb.Manager)
-//   - "mongo.client" - Client MongoDB gốc (kiểu *mongo.Client)
-//   - "mongo" - Alias cho MongoDB Manager
+//	type Manager interface {
+//	    Client() *mongo.Client
+//	    Database() *mongo.Database
+//	    DatabaseWithName(name string) *mongo.Database
+//	    Collection(name string) *mongo.Collection
+//	    CollectionWithDatabase(dbName, collectionName string) *mongo.Collection
+//	    Config() *Config
+//	    Ping(ctx context.Context) error
+//	    Disconnect(ctx context.Context) error
+//	    StartSession(opts ...*options.SessionOptions) (mongo.Session, error)
+//	    UseSession(ctx context.Context, fn func(mongo.SessionContext) error) error
+//	    UseSessionWithTransaction(ctx context.Context, fn func(mongo.SessionContext) (interface{}, error), opts ...*options.TransactionOptions) (interface{}, error)
+//	    HealthCheck(ctx context.Context) error
+//	    Stats(ctx context.Context) (map[string]interface{}, error)
+//	    ListCollections(ctx context.Context) ([]string, error)
+//	    ListDatabases(ctx context.Context) ([]string, error)
+//	    Watch(ctx context.Context, pipeline interface{}, opts ...*options.ChangeStreamOptions) (*mongo.ChangeStream, error)
+//	    CreateIndex(ctx context.Context, collectionName string, model mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error)
+//	}
 //
-// # Testing với Mocks
+// # Basic Usage
 //
-// Package này cung cấp mock cho interface Manager để hỗ trợ việc kiểm thử:
+//	// Get MongoDB manager
+//	var manager mongodb.Manager
+//	application.Container().Make("mongodb.manager", &manager)
 //
-//	mockManager := mocks.NewMockManager(t)
-//	mockManager.On("Ping", mock.Anything).Return(nil)
-//	mockManager.On("ListDatabases", mock.Anything).Return([]string{"db1", "db2"}, nil)
+//	// Work with collections
+//	users := manager.Collection("users")
 //
-//	// Test với mock
-//	err := YourFunction(mockManager)
-//	mockManager.AssertExpectations(t)
+//	// Insert document
+//	result, err := users.InsertOne(ctx, bson.M{
+//	    "name": "John Doe",
+//	    "email": "john@example.com",
+//	})
 //
-// # Yêu cầu
+//	// Find documents
+//	cursor, err := users.Find(ctx, bson.M{"active": true})
+//	defer cursor.Close(ctx)
 //
-// - Go 1.23.x hoặc mới hơn
-// - MongoDB 4.0 hoặc mới hơn (cho transactions và change streams)
+// # Transaction Support
 //
-// # Lưu ý
+//	// Simple transaction
+//	result, err := manager.UseSessionWithTransaction(ctx, func(sc mongo.SessionContext) (interface{}, error) {
+//	    users := manager.Collection("users")
+//	    orders := manager.Collection("orders")
 //
-// - Transactions yêu cầu MongoDB 4.0+ và cấu hình replica set
-// - Change Streams yêu cầu MongoDB 4.0+ và cấu hình replica set
-// - Luôn sử dụng context.Context có timeout khi gọi các phương thức MongoDB
+//	    // Perform multiple operations
+//	    userResult, err := users.InsertOne(sc, user)
+//	    if err != nil {
+//	        return nil, err
+//	    }
 //
-// Để biết thêm thông tin chi tiết, xem README.md hoặc mã nguồn của package.
+//	    orderResult, err := orders.InsertOne(sc, order)
+//	    if err != nil {
+//	        return nil, err
+//	    }
+//
+//	    return map[string]interface{}{
+//	        "user": userResult,
+//	        "order": orderResult,
+//	    }, nil
+//	})
+//
+// # Change Streams
+//
+//	// Watch for changes
+//	pipeline := mongo.Pipeline{
+//	    bson.D{{"$match", bson.D{{"operationType", "insert"}}}},
+//	}
+//
+//	stream, err := manager.WatchCollection(ctx, "users", pipeline)
+//	if err != nil {
+//	    return err
+//	}
+//	defer stream.Close(ctx)
+//
+//	for stream.Next(ctx) {
+//	    var changeDoc bson.M
+//	    if err := stream.Decode(&changeDoc); err != nil {
+//	        continue
+//	    }
+//	    // Process change
+//	}
+//
+// # Health Monitoring
+//
+//	// Check connection health
+//	if err := manager.Ping(ctx); err != nil {
+//	    log.Printf("MongoDB connection unhealthy: %v", err)
+//	}
+//
+//	// Get connection statistics
+//	stats, err := manager.Stats(ctx)
+//	if err == nil {
+//	    log.Printf("MongoDB stats: %+v", stats)
+//	}
+//
+// # Index Management
+//
+//	// Create single field index
+//	indexModel := mongo.IndexModel{
+//	    Keys: bson.D{{"email", 1}},
+//	    Options: options.Index().SetUnique(true),
+//	}
+//	indexName, err := manager.CreateIndex(ctx, "users", indexModel)
+//
+//	// List all indexes
+//	cursor, err := manager.ListIndexes(ctx, "users")
+//	defer cursor.Close(ctx)
+//
+// # Services Registered
+//
+// The ServiceProvider registers the following services in the DI container:
+//   - "mongodb.manager" - Manager interface instance
+//   - "mongodb" - Alias for manager
+//   - "mongo.client" - Raw MongoDB client (*mongo.Client)
+//   - "mongo" - Another alias for manager
+//
+// # Testing Support
+//
+// MongoDB Provider v0.1.1 includes comprehensive testing support with mockery:
+//
+//	func TestMongoOperations(t *testing.T) {
+//	    mockManager := mocks.NewMockManager(t)
+//
+//	    mockManager.On("Ping", mock.Anything).Return(nil)
+//	    mockManager.On("Collection", "users").Return(mockCollection)
+//
+//	    // Test your service
+//	    service := NewUserService(mockManager)
+//	    err := service.CreateUser(ctx, user)
+//
+//	    assert.NoError(t, err)
+//	    mockManager.AssertExpectations(t)
+//	}
+//
+// # Performance Optimization
+//
+// MongoDB Provider v0.1.1 includes several performance optimizations:
+//   - Connection pooling with configurable pool sizes
+//   - Automatic connection health monitoring
+//   - Query optimization helpers
+//   - Memory-efficient cursor handling
+//   - Background connection cleanup
+//
+// # Security Features
+//
+//   - SSL/TLS encryption support
+//   - Multiple authentication mechanisms
+//   - Credential management with environment variables
+//   - Network security configuration
+//   - Access control integration
+//
+// # Dependencies
+//
+// MongoDB Provider v0.1.1 requires:
+//   - Go 1.23.9+
+//   - go.fork.vn/di v0.1.2
+//   - go.fork.vn/config v0.1.2
+//   - go.mongodb.org/mongo-driver v1.17.3+
+//   - MongoDB Server 4.4+ (recommended 6.0+)
+//
+// # Migration from v0.1.0
+//
+// Key changes in v0.1.1:
+//   - Enhanced Manager interface with comprehensive database operations
+//   - Improved configuration structure with detailed options
+//   - Updated dependencies (di v0.1.2, config v0.1.2)
+//   - Better error handling and custom error types
+//   - Performance optimizations and memory management
+//   - Comprehensive testing support with mockery integration
+//   - Enhanced index management capabilities
+//   - Improved change streams and transaction support
+//
+// # Requirements
+//
+// - Go 1.23.9 or higher
+// - MongoDB 4.4+ (recommended 6.0+)
+// - Replica set configuration for transactions and change streams
+//
+// # Best Practices
+//
+//   - Always use context.Context with timeouts for MongoDB operations
+//   - Configure appropriate connection pool sizes for your workload
+//   - Use projections to limit returned data and improve performance
+//   - Create proper indexes for frequently queried fields
+//   - Monitor connection health and statistics regularly
+//   - Use transactions for operations that require ACID guarantees
+//   - Implement proper error handling for MongoDB-specific errors
+//
+// # Documentation
+//
+// Complete documentation is available in the docs/ directory:
+//   - docs/index.md - Quick start guide
+//   - docs/overview.md - Architecture and design
+//   - docs/reference.md - Complete API reference
+//   - docs/usage.md - Detailed usage examples
+//
+// For more information, visit: https://go.fork.vn/mongodb
 package mongodb
