@@ -1,4 +1,4 @@
-// Packa// MongoDB Provider v0.1.1 includes the following key features:
+// Package MongoDB Provider v0.1.1 includes the following key features:
 //   - Seamless integration with Go-Fork Framework's DI container
 //   - Advanced connection management with connection pooling
 //   - Enhanced authentication and SSL/TLS security

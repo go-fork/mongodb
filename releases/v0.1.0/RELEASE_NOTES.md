@@ -115,4 +115,4 @@ This release maintains all existing functionality while establishing the foundat
 
 ---
 
-**Full Changelog**: https://github.com/Fork/providers/compare/mongodb/v0.0.1...mongodb/v0.1.0
+**Full Changelog**: github.com/go-fork/providers/compare/mongodb/v0.0.1...mongodb/v0.1.0

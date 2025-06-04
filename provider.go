@@ -86,7 +86,7 @@ func (p *serviceProvider) Boot(app di.Application) {
 	// Không cần thực hiện thêm tác vụ nào trong Boot
 	// vì cấu hình đã được xử lý trong Register
 	if app == nil {
-		return
+		panic("application cannot be nil")
 	}
 }
 

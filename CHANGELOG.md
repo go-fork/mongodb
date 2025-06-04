@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+- **GitHub Integration**: Added .github directory with workflows, templates, and configuration
+- **Reorganized Release Notes**: Moved release notes to dedicated release directories
+- **Build Scripts**: Added scripts for release management and archiving
+- **Enhanced Mocks**: Added service provider mock implementation
+- **Updated Mockery Configuration**: Revised .mockery.yaml with improved settings
+
+### Changed
+- **Repository Structure**: Improved repository organization with dedicated release directories
+- **Package Structure**: Updated mock package name to `mongodb_mocks` for better clarity
+- **URL References**: Updated GitHub URLs to use the go-fork organization format
+- **Documentation**: Updated repository references in documentation files
+- **Test Structure**: Changed test files to use mongodb_test package pattern
+- **Dependencies**: Updated direct dependencies to latest versions
+
 ## v0.1.1 - 2025-12-31
 
 ### Added
@@ -82,5 +97,12 @@
 - `go.fork.vn/config`: Configuration management
 
 
-[v0.1.1]: https://github.com/Fork/mongodb/releases/tag/v0.1.1
-[v0.1.0]: https://github.com/Fork/mongodb/releases/tag/v0.1.0
+[v0.1.1]: https://github.com/go-fork/mongodb/releases/tag/v0.1.1
+[v0.1.0]: https://github.com/go-fork/mongodb/releases/tag/v0.1.0
+
+## [Unreleased]
+
+### Changed
+- Changed test files to use mongodb_test package
+- Updated direct dependencies to latest versions
+- Fixed golangci-lint errors

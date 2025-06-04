@@ -1,15 +1,17 @@
 with-expecter: true
-keeptree: true
+resolve-type-alias: false
+disable-version-string: true
+quiet: false
+dir: "mocks"  # Giữ nguyên tên thư mục mocks
+outpkg: "mongodb_mocks"  # Đặt tên package động theo tên package gốc
+mockname: "Mock{{.InterfaceName}}"  # Chuẩn đặt tên mock
+structname: "Mock{{.InterfaceName}}"
+filename: "{{.InterfaceName | snakecase}}.go"  # Tên file mock theo tên interface
+issue-845-fix: true
+recursive: true
 packages:
   go.fork.vn/mongodb:
     interfaces:
       Manager:
-        config:
-          filename: "manager.go"
-          dir: "mocks"
-          mockname: "MockManager"
-          outpkg: "mocks"
-          inpackage: false
-          testonly: false
-          all: false
-          case: "camel"
+      ServiceProvider:
+all: false

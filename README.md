@@ -23,7 +23,7 @@ MongoDB Provider v0.1.1 offers comprehensive MongoDB integration for Fork Framew
 ## 🛠️ Installation
 
 ```bash
-go get go.fork.vn/mongodb@v0.1.1
+go get go.fork.vn/mongodb
 ```
 
 ## 📋 Requirements
@@ -595,7 +595,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Fork/mongodb.git
+   git clone github.com/go-fork/mongodb.git
    cd mongodb
    ```
 
@@ -626,9 +626,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 - **Documentation**: [go.fork.vn/mongodb](https://go.fork.vn/mongodb)
-- **Issues**: [GitHub Issues](https://github.com/Fork/mongodb/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Fork/mongodb/discussions)
-- **Examples**: [Fork/recipes](https://github.com/Fork/recipes/tree/main/examples/mongodb)
+- **Issues**: [GitHub Issues](github.com/go-fork/mongodb/issues)
+- **Discussions**: [GitHub Discussions](github.com/go-fork/mongodb/discussions)
+- **Examples**: [Fork/recipes](github.com/go-fork/recipes/tree/main/examples/mongodb)
 
 ## 🗺️ Roadmap
 
