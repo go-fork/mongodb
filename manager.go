@@ -359,20 +359,20 @@ func (m *manager) createClientWithRetry() (*mongo.Client, error) {
 	var lastErr error
 	maxRetries := 3
 	baseDelay := time.Second
-	
+
 	for i := 0; i < maxRetries; i++ {
 		client, err := createMongoClient(*m.config)
 		if err == nil {
 			return client, nil
 		}
-		
+
 		lastErr = err
 		if i < maxRetries-1 {
 			delay := baseDelay * time.Duration(1<<uint(i)) // exponential backoff: 1s, 2s, 4s
 			time.Sleep(delay)
 		}
 	}
-	
+
 	return nil, fmt.Errorf("failed to create MongoDB client after %d retries: %w", maxRetries, lastErr)
 }
 

@@ -7,24 +7,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	config_mocks "go.fork.vn/config/mocks"
 	di_mocks "go.fork.vn/di/mocks"
 	"go.fork.vn/mongodb"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // isMongoDBAvailable checks if MongoDB is available for testing
 func isMongoDBAvailable() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	
+
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
 		return false
 	}
 	defer client.Disconnect(ctx)
-	
+
 	return client.Ping(ctx, nil) == nil
 }
 
