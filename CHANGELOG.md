@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+- **CI/CD Tests**: Added MongoDB availability check to skip integration tests when MongoDB is not available
+- **Test Infrastructure**: Improved test reliability for CI/CD environments without MongoDB
+- **Connection Management**: Enhanced manager with retry mechanism and exponential backoff for better connection reliability
+- **Provider Testing**: Fixed provider tests to work properly in both local and CI/CD environments
+
+### Technical Improvements
+- **Retry Logic**: Added `createClientWithRetry()` method with configurable retry attempts and exponential backoff
+- **Test Environment Detection**: Implemented `isMongoDBAvailable()` helper function for environment-aware testing
+- **Code Cleanup**: Removed unnecessary test mode configurations and simplified architecture
+- **Error Handling**: Improved error handling and connection stability in CI/CD environments
+
 ## v0.1.2 - 2025-06-04
 
 ### Added
