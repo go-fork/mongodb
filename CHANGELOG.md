@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## v0.1.2 - 2025-06-04
+
 ### Added
 - **GitHub Integration**: Added .github directory with workflows, templates, and configuration
 - **Reorganized Release Notes**: Moved release notes to dedicated release directories
@@ -97,12 +99,7 @@
 - `go.fork.vn/config`: Configuration management
 
 
+
+[v0.1.2]: https://github.com/go-fork/mongodb/releases/tag/v0.1.2
 [v0.1.1]: https://github.com/go-fork/mongodb/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/go-fork/mongodb/releases/tag/v0.1.0
-
-## [Unreleased]
-
-### Changed
-- Changed test files to use mongodb_test package
-- Updated direct dependencies to latest versions
-- Fixed golangci-lint errors

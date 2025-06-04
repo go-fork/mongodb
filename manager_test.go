@@ -189,6 +189,7 @@ func TestManager_Disconnect(t *testing.T) {
 		// Create manager with mtest client but test only the logic
 		mgr := &manager{
 			client:   mt.Client,
+			config:   &cfg,
 			database: mt.Client.Database(cfg.Database),
 		}
 
