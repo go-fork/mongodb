@@ -16,6 +16,9 @@ type Config struct {
 	// Application name to identify the connection in MongoDB logs
 	AppName string `yaml:"app_name" mapstructure:"app_name"`
 
+	// Test mode - disable actual connection for testing
+	TestMode bool `yaml:"test_mode" mapstructure:"test_mode"`
+
 	// Connection pool settings
 	MaxPoolSize     uint64 `yaml:"max_pool_size" mapstructure:"max_pool_size"`           // Maximum number of connections in the connection pool
 	MinPoolSize     uint64 `yaml:"min_pool_size" mapstructure:"min_pool_size"`           // Minimum number of connections in the connection pool

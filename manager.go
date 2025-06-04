@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"strings"
 	"time"
 
@@ -344,13 +345,35 @@ func createMongoClient(config Config) (*mongo.Client, error) {
 // Client returns the underlying MongoDB client
 func (m *manager) Client() *mongo.Client {
 	if m.client == nil {
-		client, err := createMongoClient(*m.config)
+		client, err := m.createClientWithRetry()
 		if err != nil {
 			panic("MongoDB client creation failed: " + err.Error())
 		}
 		m.client = client
 	}
 	return m.client
+}
+
+// createClientWithRetry creates MongoDB client with retry mechanism
+func (m *manager) createClientWithRetry() (*mongo.Client, error) {
+	var lastErr error
+	maxRetries := 3
+	baseDelay := time.Second
+	
+	for i := 0; i < maxRetries; i++ {
+		client, err := createMongoClient(*m.config)
+		if err == nil {
+			return client, nil
+		}
+		
+		lastErr = err
+		if i < maxRetries-1 {
+			delay := baseDelay * time.Duration(1<<uint(i)) // exponential backoff: 1s, 2s, 4s
+			time.Sleep(delay)
+		}
+	}
+	
+	return nil, fmt.Errorf("failed to create MongoDB client after %d retries: %w", maxRetries, lastErr)
 }
 
 // Database returns the default database

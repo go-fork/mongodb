@@ -1,14 +1,32 @@
 package mongodb_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	config_mocks "go.fork.vn/config/mocks"
 	di_mocks "go.fork.vn/di/mocks"
 	"go.fork.vn/mongodb"
 )
+
+// isMongoDBAvailable checks if MongoDB is available for testing
+func isMongoDBAvailable() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		return false
+	}
+	defer client.Disconnect(ctx)
+	
+	return client.Ping(ctx, nil) == nil
+}
 
 // setupTestMongoConfig creates a MongoDB config for testing
 func setupTestMongoConfig() *mongodb.Config {
@@ -62,6 +80,11 @@ func TestNewServiceProvider(t *testing.T) {
 
 func TestServiceProvider_Register(t *testing.T) {
 	t.Run("registers mongodb services to container with config", func(t *testing.T) {
+		// Skip test if MongoDB is not available
+		if !isMongoDBAvailable() {
+			t.Skip("MongoDB not available, skipping integration test")
+		}
+
 		// Arrange
 		mockContainer := di_mocks.NewMockContainer(t)
 		mockConfig := config_mocks.NewMockManager(t)
@@ -183,6 +206,11 @@ func TestServiceProvider_Requires(t *testing.T) {
 }
 
 func TestDynamicProvidersList(t *testing.T) {
+	// Skip test if MongoDB is not available
+	if !isMongoDBAvailable() {
+		t.Skip("MongoDB not available, skipping integration test")
+	}
+
 	// Test that providers are correctly registered in the dynamic list
 	mockContainer := di_mocks.NewMockContainer(t)
 	mockConfig := config_mocks.NewMockManager(t)
